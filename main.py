@@ -1,9 +1,11 @@
 from openai import OpenAI
+import os
 from elevenlabs.client import ElevenLabs
 from elevenlabs import play
 import json
 from flask import Flask, request, jsonify, session, send_from_directory, render_template, flash, url_for, redirect
 from flask_cors import CORS
+from flask_socketio import SocketIO, emit
 from pathlib import Path
 import random
 from mutagen.mp3 import MP3
@@ -14,14 +16,26 @@ from pydub import AudioSegment
 from collections.abc import Iterable
 
 
-load_dotenv()
+load_dotenv(dotenv_path=Path("keys.env"), override=True)
+
+client = OpenAI(
+    api_key= os.getenv("OPENAI_API_KEY")
+)
+clientX = OpenAI(
+    base_url="https://api.x.ai/v1",
+    api_key=
+    os.getenv("GROK_API_KEY")
+)
+
+elevenlabs = ElevenLabs(
+        api_key=os.getenv("ELEVEN_LABS_API_KEY"),
+)
 
 app = Flask(__name__)
 
 app.config['SECRET_KEY'] = 'supersecretkey'
 CORS(app)
-
-
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 @app.route('/config/view/generateConversation', methods=['GET'])
 def generateConversation():
@@ -49,6 +63,7 @@ def generateConversation():
         messages=messages,
         temperature=1,
     )
+    print("Text generation complete")
 
     output = completion.choices[0].message.content
     jsonOutput = json.loads(output)
@@ -109,5 +124,7 @@ def concat_elevenlabs_mp3(*clips):
     return buf.getvalue()
 
 
-generateConversation()
+if __name__ == '__main__':
+    generateConversation()
+    socketio.run(app, host='127.0.0.1', port=5000, debug=True, allow_unsafe_werkzeug=True)
 

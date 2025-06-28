@@ -1,19 +1,11 @@
 from openai import OpenAI
 import os
 from elevenlabs.client import ElevenLabs
-from elevenlabs import play
-import json
 from flask import Flask, request, jsonify, session, send_from_directory, render_template, flash, url_for, redirect
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 from pathlib import Path
-import random
-from mutagen.mp3 import MP3, HeaderNotFoundError
-import time
-from io import BytesIO
 from dotenv import load_dotenv
-from pydub import AudioSegment
-from collections.abc import Iterable
 from Game import Game
 
 load_dotenv(dotenv_path=Path("keys.env"), override=True)
@@ -33,30 +25,39 @@ elevenlabs = ElevenLabs(
 )
 
 app = Flask(__name__)
-
 app.config['SECRET_KEY'] = 'supersecretkey'
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-game = Game(socket=socketio)
+game = None
+
+@socketio.on('connect')
+def handleConnection():
+    global totalViews
+    if totalViews == 0:
+        global game
+        game = Game(socketio)
+
+
+    totalViews += 1
+    socketio.emit("concurrentViews",  {"totalViews": totalViews})
+    print("Yep increase them views brev")
 
 @socketio.on("play_clip")
 def handle_play_clip():
-
     # 1) broadcast the data (binary=True keeps it raw, no base64)
-    socketio.emit("audio_bytes_on_connection", game.audio, broadcast=True, binary=True)
+    socketio.emit("audio_bytes_on_connection", game.audio)
 
     # 2) broadcast a start time = now + PLAY_AHEAD seconds (epoch)
-    socketio.emit("start_at", game.audioStartTime, broadcast=True)
+    socketio.emit("start_at", game.audioStartTime)
 
-def mp3_duration(gen) -> float:
-    """
-    Duration (seconds) of an ElevenLabs clip returned with stream=True.
-    Works even if the generator interleaves empty / non-byte chunks.
-    """
-    raw = b"".join(ch for ch in gen if isinstance(ch, (bytes, bytearray)) and ch)
-    segment = AudioSegment.from_file(BytesIO(raw), format="mp3")   # decode once
-    return len(segment) / 1000.0   # Pydub len() → milliseconds
+@socketio.on('vote')
+def handleVote(data):
+    side = data.get('side')
+    user = data.get('user')
+    game.logNewVote(side)
+    print(game.totalVotes)
+    socketio.emit("persuasionBarVotes", {"totalVotes": game.totalVotes})
 
 
 if __name__ == '__main__':

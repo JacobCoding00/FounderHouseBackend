@@ -35,7 +35,7 @@ class Game:
         self.audioStartTime = None
         self.speaking = None
         self.socketio = socket
-        
+        self.generateQuestion()
     def generateCelebs(self) -> None:
             """
             Selects two unique celebrities from 'celebs.json' and
@@ -55,7 +55,7 @@ class Game:
             # Assign to left and right agents
             # The 'name' and 'voiceId' keys match your JSON structure
             self.left = Agent(name=chosen_celebs[0]["name"], voiceId=chosen_celebs[0]["voiceId"])
-            self.right = Agent(name=chosen_celebs[1]["name"], voiceId=chosen_celebs[1]["voiceId"]) 
+            self.right = Agent(name=chosen_celebs[1]["name"], voiceId=chosen_celebs[1]["voiceId"])
         
     def generateQuestion(self) -> None:
         systemPrompt = "You will be given a variation on the trolley problem, create a debate that focus on entertainment value and being hilarious between two famous people, Have a speech from each then a rebuttal from each. make sure they insult each other \n\n Formatting instructions: \n json format, with a person1: followed by first text\n person2 followed by second text\n rebuttal1 followed by first rebutttal\n rebuttal2 followed by second rebuttal \n the text should only include what each person will say, as it will be used for text to speech"
@@ -136,7 +136,8 @@ class Game:
             self.socketio.emit("speaker", self.speaking)
             self.audio = audio
             self.audioStartTime = time.time()
-            self.socketio.emit("audio_bytes", self.audio, broadcast=True, binary=True)
+            print("emitting audio")
+            self.socketio.emit("audio_bytes", self.audio)
             play(audio)
 
     def logNewVote(self, vote) -> None:

@@ -21,6 +21,7 @@ load_dotenv(dotenv_path=Path("keys.env"), override=True)
 client = OpenAI(
     api_key= os.getenv("OPENAI_API_KEY")
 )
+
 clientX = OpenAI(
     base_url="https://api.x.ai/v1",
     api_key=
@@ -44,12 +45,19 @@ def generateConversation():
     with Path("scenarios.json").open("r", encoding="utf-8") as fp:
         scenarios = json.load(fp)  # data is now a dict / list matching the JSON
 
+    with Path("celebs.json").open("r", encoding="utf-8") as fp:
+        people = json.load(fp)  # data is now a dict / list matching the JSON
+
     group = random.choice(scenarios.get("1"))
     singleton = random.choice(scenarios.get("2"))
-    person1 = "Neil Degrasse Tyson"
-    person2 = "Jeremy Clarkson"
+    person1 = random.choice(people)
+    person2 = random.choice(people)
+    while True:
+        if person2 == person1:
+            person2 = random.choice(people)
+            break
 
-    prompt = f"either dont switch the lever and let {group} die, or switch the lever and let {singleton} die.\nperson1 is {person1}, person2 is {person2}"
+    prompt = f"either dont switch the lever and let {group} die, or switch the lever and let {singleton} die.\nperson1 is {person1.get('name')}, person2 is {person2.get('name')}"
 
 
 
@@ -70,14 +78,14 @@ def generateConversation():
 
     audio1 = elevenlabs.text_to_speech.convert(
         text=jsonOutput.get("person1"),
-        voice_id="bhHp3QpEswU7MPJwQhel",
+        voice_id=person1.get('voiceId'),
         model_id="eleven_multilingual_v2",
         output_format="mp3_44100_128",
     )
 
     audio2 = elevenlabs.text_to_speech.convert(
         text=jsonOutput.get("person2"),
-        voice_id="PtaCevw2ZQ5izoAWXzIy",
+        voice_id=person2.get('voiceId'),
         model_id="eleven_multilingual_v2",
         output_format="mp3_44100_128",
 
@@ -85,14 +93,14 @@ def generateConversation():
 
     audio3 = elevenlabs.text_to_speech.convert(
         text=jsonOutput.get("rebuttal1"),
-        voice_id="bhHp3QpEswU7MPJwQhel",
+        voice_id=person1.get('voiceId'),
         model_id="eleven_multilingual_v2",
         output_format="mp3_44100_128",
     )
 
     audio4 = elevenlabs.text_to_speech.convert(
         text=jsonOutput.get("rebuttal2"),
-        voice_id="PtaCevw2ZQ5izoAWXzIy",
+        voice_id=person2.get('voiceId'),
         model_id="eleven_multilingual_v2",
         output_format="mp3_44100_128",
     )
@@ -125,6 +133,5 @@ def concat_elevenlabs_mp3(*clips):
 
 
 if __name__ == '__main__':
-    generateConversation()
     socketio.run(app, host='127.0.0.1', port=5000, debug=True, allow_unsafe_werkzeug=True)
 

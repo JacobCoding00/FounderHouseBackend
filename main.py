@@ -10,6 +10,8 @@ from mutagen.mp3 import MP3
 import time
 from io import BytesIO
 from dotenv import load_dotenv
+from pydub import AudioSegment
+from collections.abc import Iterable
 
 
 load_dotenv()
@@ -19,11 +21,13 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'supersecretkey'
 CORS(app)
 
+
+
 @app.route('/config/view/generateConversation', methods=['GET'])
 def generateConversation():
     systemPrompt = "You will be given a variation on the trolley problem, create a debate that focus on entertainment value and being hilarious between two famous people, Have a speech from each then a rebuttal from each. make sure they insult each other \n\n Formatting instructions: \n json format, with a person1: followed by first text\n person2 followed by second text\n rebuttal1 followed by first rebutttal\n rebuttal2 followed by second rebuttal \n the text should only include what each person will say, as it will be used for text to speech"
 
-    with Path("/scenarios.json").open("r", encoding="utf-8") as fp:
+    with Path("scenarios.json").open("r", encoding="utf-8") as fp:
         scenarios = json.load(fp)  # data is now a dict / list matching the JSON
 
     group = random.choice(scenarios.get("1"))
@@ -61,6 +65,7 @@ def generateConversation():
         voice_id="PtaCevw2ZQ5izoAWXzIy",
         model_id="eleven_multilingual_v2",
         output_format="mp3_44100_128",
+
     )
 
     audio3 = elevenlabs.text_to_speech.convert(
@@ -77,14 +82,32 @@ def generateConversation():
         output_format="mp3_44100_128",
     )
 
-    play(audio1)
-    print("audio 1 playing")
-    time.sleep(MP3(BytesIO(audio1)).info.length)
-    play(audio2)
-    time.sleep(MP3(BytesIO(audio2)).info.length)
-    play(audio3)
-    time.sleep(MP3(BytesIO(audio3)).info.length)
-    play(audio4)
-    time.sleep(MP3(BytesIO(audio4)).info.length)
+    final_bytes = concat_elevenlabs_mp3(audio1, audio2, audio3, audio4)
 
+    play(final_bytes)
+
+def to_bytes(obj):
+    """Accept bytes, bytearray, file-like, or generator of chunks."""
+    if isinstance(obj, (bytes, bytearray)):
+        return obj
+    if hasattr(obj, "read"):          # file-like
+        return obj.read()
+    if isinstance(obj, Iterable):     # generator/iterator of chunks
+        return b"".join(obj)
+    raise TypeError("Unsupported audio container")
+
+def concat_elevenlabs_mp3(*clips):
+    segments = [
+        AudioSegment.from_file(BytesIO(to_bytes(c)), format="mp3")
+        for c in clips
+    ]
+    combined = segments[0]
+    for seg in segments[1:]:
+        combined += seg               # concatenate
+    buf = BytesIO()
+    combined.export(buf, format="mp3", bitrate="128k")
+    return buf.getvalue()
+
+
+generateConversation()
 
